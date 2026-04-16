@@ -26,11 +26,21 @@ const userSchema = new Schema(
   },
   {
     timestamps: true,
+    versionKey: false,
     toJSON: {
       virtuals: true,
       transform: function (doc, ret) {
         delete ret._id;
         delete ret.password;
+        return ret;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        delete ret._id;
+        delete ret.password;
+        return ret;
       },
     },
   },
