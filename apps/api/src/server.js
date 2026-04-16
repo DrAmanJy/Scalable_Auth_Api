@@ -3,8 +3,12 @@ import cors from 'cors';
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger.js';
 
-import v1routes from './v3/auth.routes.js';
+import v1routes from './v1/auth.routes.js';
+
+import v3routes from './v3/auth.routes.js';
+
 import { connectDb } from './config/db.js';
+import errorHandler from './middlewares/error.middleware.js';
 
 const server = express();
 
@@ -16,7 +20,9 @@ server.get('/', (_, res) => {
   res.json({ message: 'Server is running' });
 });
 
-server.use('/v3/auth', v1routes);
+server.use('/v1/auth', v1routes);
+server.use('/v3/auth', v3routes);
+server.use(errorHandler);
 
 await connectDb();
 server.listen(3000, (err) => {
