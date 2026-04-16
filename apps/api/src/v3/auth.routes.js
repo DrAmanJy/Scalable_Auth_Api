@@ -1,4 +1,6 @@
 import express from 'express';
+import * as authController from './auth.controller.js';
+import { isAuthV3 } from '../middlewares/auth.moddleware.js';
 const router = express.Router();
 
 /**
@@ -22,8 +24,10 @@ const router = express.Router();
  *       201:
  *         description: User created
  */
-router.post('/register', (req, res) => {
-  res.json({ message: 'v1 register' });
-});
+router.post('/register', authController.register);
+
+router.post('/login', authController.login);
+
+router.get('/me', isAuthV3, authController.getMe);
 
 export default router;
