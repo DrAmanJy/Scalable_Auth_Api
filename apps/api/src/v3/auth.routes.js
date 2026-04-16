@@ -1,6 +1,6 @@
 import express from 'express';
 import * as authController from './auth.controller.js';
-import { isAuthV3 } from '../middlewares/auth.moddleware.js';
+import { isAuthV3 } from '../middlewares/auth.middleware.js';
 const router = express.Router();
 
 /**
