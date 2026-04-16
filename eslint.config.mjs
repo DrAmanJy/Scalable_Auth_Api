@@ -10,7 +10,7 @@ export default defineConfig([
     files: ['apps/**/*.js', 'packages/**/*.js'],
     plugins: { js, prettier: prettierPlugin },
     extends: ['js/recommended'],
-    languageOptions: { globals: globals.browser },
+    languageOptions: { globals: globals.node },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
       'no-console': 'off',
