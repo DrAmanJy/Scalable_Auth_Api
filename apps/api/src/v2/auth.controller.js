@@ -64,3 +64,23 @@ export const login = async (req, res) => {
     .cookie('refreshToken', refreshToken, cookieOptions)
     .json({ status: 'success', message: 'User successfully login', user, accessToken });
 };
+
+export const logoutUser = async (req, res) => {
+  const existingUser = await User.findById(req.user.id);
+
+  if (existingUser) {
+    existingUser.refreshToken = undefined;
+    await existingUser.save();
+  }
+
+  res.clearCookie('refreshToken', cookieOptions);
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Logged out successfully',
+  });
+};
+
+export const getMe = async (req, res) => {
+  res.json({ status: 'success', message: 'User fetched successfully' });
+};
