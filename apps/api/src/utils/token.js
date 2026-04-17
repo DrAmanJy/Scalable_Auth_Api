@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 
 export const createTokenV1 = (payload, type = 'access') => {
   const expiresIn =
@@ -7,4 +8,9 @@ export const createTokenV1 = (payload, type = 'access') => {
     type === 'access' ? process.env.JWT_ACCESS_SECRET : process.env.JWT_REFRESH_SECRET;
 
   return jwt.sign(payload, secretKey, { expiresIn });
+};
+
+export const hashToken = async (token) => {
+  const saltRounds = 5;
+  return await bcrypt.hash(token, saltRounds);
 };
