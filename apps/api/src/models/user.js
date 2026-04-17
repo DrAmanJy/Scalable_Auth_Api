@@ -23,6 +23,7 @@ const userSchema = new Schema(
       min: [6, 'Password must be 6 char long'],
       select: false,
     },
+    refreshToken: { type: String },
   },
   {
     timestamps: true,
