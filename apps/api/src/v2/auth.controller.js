@@ -1,5 +1,6 @@
+import jwt from 'jsonwebtoken';
 import User from '../models/user.js';
-import { createTokenV1, hashToken } from '../utils/token.js';
+import { createTokenV1, hashToken, verifyToken } from '../utils/token.js';
 import bcrypt from 'bcrypt';
 
 const cookieOptions = {
@@ -79,6 +80,34 @@ export const logoutUser = async (req, res) => {
     status: 'success',
     message: 'Logged out successfully',
   });
+};
+
+export const refreshAccessToken = async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) return res.status(401).json({ status: 'fail', message: 'Token not provided' });
+
+  const decoded = verifyToken(refreshToken);
+
+  if (!decoded) return res.status(401).json({ status: 'fail', message: 'Invalid token provided' });
+
+  const user = await User.findById(decoded.id);
+
+  if (!user) return res.status(401).json({ status: 'fail', message: 'Invalid token provided' });
+
+  const accessToken = createTokenV1({ id: user.id });
+  const newRefreshToken = createTokenV1({ id: user.id }, 'refresh');
+
+  const hashRefreshToken = await hashToken(newRefreshToken);
+
+  user.refreshToken = hashRefreshToken;
+
+  await user.save();
+
+  res
+    .status(200)
+    .cookie('refreshToken', refreshToken, cookieOptions)
+    .json({ status: 'success', message: 'User successfully login', user, accessToken });
 };
 
 export const getMe = async (req, res) => {
