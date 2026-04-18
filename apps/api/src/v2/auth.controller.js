@@ -1,3 +1,4 @@
+import bcrypt from 'bcrypt';
 import User from '../models/user.js';
 import sessionService from './session.service.js';
 
@@ -29,4 +30,27 @@ export const register = async (req, res) => {
     .cookie('sessionId', sessionId, cookieOptions)
     .status(201)
     .json({ status: 'success', message: 'User successfully registered', user });
+};
+
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password)
+    return res.status(400).json({ status: 'fail', message: 'All fields are required' });
+
+  const user = await User.findOne({ email }).select('+password');
+
+  if (!user) return res.status(400).json({ status: 'fail', message: 'Email or password invalid' });
+
+  const isPassValid = await bcrypt.compare(password, user.password);
+
+  if (!isPassValid)
+    return res.status(400).json({ status: 'fail', message: 'Email or password invalid' });
+
+  const sessionId = sessionService.createSession(user._id);
+
+  res
+    .cookie('sessionId', sessionId, cookieOptions)
+    .status(200)
+    .json({ status: 'success', message: 'User successfully login', user });
 };
