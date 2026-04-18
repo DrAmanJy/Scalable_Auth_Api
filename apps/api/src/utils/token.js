@@ -23,5 +23,14 @@ export const verifyToken = (token, type = 'refresh') => {
   const secretKey =
     type === 'access' ? process.env.JWT_ACCESS_SECRET : process.env.JWT_REFRESH_SECRET;
 
+  if (!secretKey) {
+    throw new Error(`Missing JWT secret for ${type} token`);
+  }
+
   return jwt.verify(token, secretKey);
+};
+
+export const verifyHash = async (data, encrypted) => {
+  const isValid = bcrypt.compare(data, encrypted);
+  return isValid;
 };
