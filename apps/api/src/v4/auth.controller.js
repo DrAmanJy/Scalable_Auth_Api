@@ -1,6 +1,5 @@
-import jwt from 'jsonwebtoken';
 import User from '../models/user.js';
-import { createTokenV1, hashToken, verifyToken } from '../utils/token.js';
+import { createTokenV1, hashToken, verifyHash, verifyToken } from '../utils/token.js';
 import bcrypt from 'bcrypt';
 
 const cookieOptions = {
@@ -83,33 +82,57 @@ export const logoutUser = async (req, res) => {
 };
 
 export const refreshAccessToken = async (req, res) => {
-  const refreshToken = req.cookies.refreshToken;
+  const refreshToken = req.cookies?.refreshToken;
 
-  if (!refreshToken) return res.status(401).json({ status: 'fail', message: 'Token not provided' });
+  if (!refreshToken) {
+    return res.status(401).json({
+      status: 'fail',
+      message: 'Refresh token is missing. Please log in again.',
+    });
+  }
 
-  const decoded = verifyToken(refreshToken);
+  let decoded;
 
-  if (!decoded) return res.status(401).json({ status: 'fail', message: 'Invalid token provided' });
+  try {
+    decoded = verifyToken(refreshToken, 'refresh');
+  } catch (_) {
+    return res.status(401).json({
+      status: 'fail',
+      message: 'Invalid or expired refresh token',
+    });
+  }
 
-  const user = await User.findById(decoded.id);
+  const user = await User.findById(decoded.id).select('+refreshToken');
 
-  if (!user) return res.status(401).json({ status: 'fail', message: 'Invalid token provided' });
+  if (!user || !user.refreshToken) {
+    return res.status(401).json({
+      status: 'fail',
+      message: 'User session is invalid. Please log in again.',
+    });
+  }
 
-  const accessToken = createTokenV1({ id: user.id });
+  const isValidToken = await verifyHash(refreshToken, user.refreshToken);
+
+  if (!isValidToken) {
+    return res.status(401).json({
+      status: 'fail',
+      message: 'Refresh token mismatch. Possible session hijack detected.',
+    });
+  }
+
+  const accessToken = createTokenV1({ id: user.id }, 'access');
   const newRefreshToken = createTokenV1({ id: user.id }, 'refresh');
 
-  const hashRefreshToken = await hashToken(newRefreshToken);
-
-  user.refreshToken = hashRefreshToken;
-
+  user.refreshToken = await hashToken(newRefreshToken);
   await user.save();
 
-  res
-    .status(200)
-    .cookie('refreshToken', refreshToken, cookieOptions)
-    .json({ status: 'success', message: 'User successfully login', user, accessToken });
+  return res.status(200).cookie('refreshToken', newRefreshToken, cookieOptions).json({
+    status: 'success',
+    message: 'Access token refreshed successfully.',
+    accessToken,
+  });
 };
 
 export const getMe = async (req, res) => {
-  res.json({ status: 'success', message: 'User fetched successfully' });
+  res.json({ status: 'success', message: 'User fetched successfully', user: req.user });
 };
