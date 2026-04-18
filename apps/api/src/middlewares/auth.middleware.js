@@ -1,7 +1,7 @@
-import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import User from '../models/user.js';
 import { verifyToken } from '../utils/token.js';
+import sessionService from '../v2/session.service.js';
 
 export const isAuthV1 = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -32,6 +32,29 @@ export const isAuthV1 = async (req, res, next) => {
     return res
       .status(401)
       .json({ status: false, message: 'Not authorized, invalid credentials provided' });
+
+  req.user = user;
+  next();
+};
+
+export const requireSessionAuth = async (req, res, next) => {
+  const sessionId = req.cookies.sessionId;
+  if (!sessionId)
+    return res
+      .status(401)
+      .json({ status: 'fail', message: 'Not authorized, no session id provided' });
+
+  const session = sessionService.getSession(sessionId);
+
+  if (!session)
+    return res.status(401).json({ status: 'fail', message: 'Invalid or expired session' });
+
+  const user = await User.findById(session.userId);
+
+  if (!user)
+    return res
+      .status(401)
+      .json({ status: 'fail', message: 'The user belonging to this token no longer exists' });
 
   req.user = user;
   next();
