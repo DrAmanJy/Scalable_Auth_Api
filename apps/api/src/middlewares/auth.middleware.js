@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
 import User from '../models/user.js';
+import { verifyToken } from '../utils/token.js';
 
 export const isAuthV1 = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -46,12 +47,9 @@ export const isAuthV3 = async (req, res, next) => {
   if (!accessToken)
     return res.status(401).json({ status: 'fail', message: 'Invalid token format' });
 
-  let decoded;
-  try {
-    decoded = jwt.verify(accessToken, process.env.JWT_ACCESS_SECRET);
-  } catch {
-    return res.status(401).json({ message: 'Invalid or expired access token' });
-  }
+  const decoded = verifyToken(accessToken, 'access');
+
+  if (!decoded) return res.status(401).json({ message: 'Invalid or expired access token' });
 
   const user = await User.findById(decoded.id);
   if (!user)
