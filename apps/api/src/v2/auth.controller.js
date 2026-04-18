@@ -54,3 +54,20 @@ export const login = async (req, res) => {
     .status(200)
     .json({ status: 'success', message: 'User successfully login', user });
 };
+
+export const logout = async (req, res) => {
+  const sessionId = req.cookies.sessionId;
+  if (!sessionId)
+    return res.status(400).json({ status: 'fail', message: 'User already logged out' });
+
+  sessionService.deleteSession(sessionId);
+
+  res.status(200).clearCookie('sessionId', cookieOptions).json({
+    status: 'success',
+    message: 'Logged out successfully',
+  });
+};
+
+export const getMe = async (req, res) => {
+  res.status(200).json({ status: 'success', message: 'User fetched successfully', user: req.user });
+};
