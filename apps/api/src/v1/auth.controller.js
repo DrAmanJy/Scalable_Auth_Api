@@ -33,6 +33,5 @@ export const login = async (req, res) => {
 };
 
 export const getMe = async (req, res) => {
-  console.log('here');
   res.status(200).json({ status: 'success', message: 'User fetched successfully', user: req.user });
 };
