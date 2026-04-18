@@ -33,14 +33,15 @@ const userSchema = new Schema(
       transform: function (doc, ret) {
         delete ret._id;
         delete ret.password;
+        delete ret.refreshToken;
         return ret;
       },
     },
     toObject: {
       virtuals: true,
       transform: function (doc, ret) {
-        delete ret._id;
         delete ret.password;
+        delete ret.refreshToken;
         return ret;
       },
     },
