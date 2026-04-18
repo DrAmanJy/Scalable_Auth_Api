@@ -6,7 +6,7 @@ import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger.js';
 
 import v1routes from './v1/auth.routes.js';
-
+import v2routes from './v2/auth.routes.js';
 import v3routes from './v3/auth.routes.js';
 import v4routes from './v4/auth.routes.js';
 
@@ -25,6 +25,7 @@ server.get('/', (_, res) => {
 });
 
 server.use('/v1/auth', v1routes);
+server.use('/v2/auth', v2routes);
 server.use('/v3/auth', v3routes);
 server.use('/v4/auth', v4routes);
 server.use(errorHandler);
