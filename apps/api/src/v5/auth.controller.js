@@ -202,3 +202,9 @@ export const logoutAll = async (req, res) => {
     })
     .json({ status: 'success', message: 'User successfully logged out from all devices.' });
 };
+
+export const getMe = async (req, res) => {
+  res
+    .status(200)
+    .json({ status: 'success', message: 'User fetched successfully.', user: req.user });
+};
