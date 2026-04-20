@@ -1,7 +1,7 @@
-import User from '../models/userV2';
+import User from '../models/userV2.js';
 import crypto from 'crypto';
-import { createTokenV1, verifyHash, verifyToken } from '../utils/token';
-import refreshTokenStorage from './auth.service';
+import { createTokenV1, verifyHash, verifyToken } from '../utils/token.js';
+import refreshTokenStorage from './auth.service.js';
 
 const cookieOptions = {
   httpOnly: true,
