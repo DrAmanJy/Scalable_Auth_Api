@@ -1,6 +1,6 @@
 import User from '../models/userV2';
 import crypto from 'crypto';
-import { createTokenV1, verifyHash } from '../utils/token';
+import { createTokenV1, verifyHash, verifyToken } from '../utils/token';
 import refreshTokenStorage from './auth.service';
 
 const cookieOptions = {
@@ -78,4 +78,81 @@ export const login = async (req, res) => {
     .cookie('deviceId', deviceId, deviceCookieOptions)
     .cookie('refreshToken', refreshToken, cookieOptions)
     .json({ status: 'success', message: 'User successfully logged in', user, accessToken });
+};
+
+export const refreshToken = async (req, res) => {
+  const incomingRefreshToken = req.cookies.refreshToken;
+
+  if (!incomingRefreshToken) {
+    return res
+      .status(401)
+      .json({ status: 'fail', message: 'Refresh token is missing. Please log in again.' });
+  }
+
+  const decoded = verifyToken(incomingRefreshToken, 'refresh');
+
+  if (!decoded) {
+    return res
+      .status(401)
+      .json({ status: 'fail', message: 'Invalid refresh token. Please log in again.' });
+  }
+
+  if (!req.cookies.deviceId || decoded.deviceId !== req.cookies.deviceId) {
+    return res
+      .status(401)
+      .json({ status: 'fail', message: 'Device mismatch. Please log in again.' });
+  }
+
+  const user = await User.findById(decoded.userId);
+  if (!user) {
+    await refreshTokenStorage.deleteAll(decoded.userId);
+    return res.status(401).json({ status: 'fail', message: 'User no longer exists.' });
+  }
+
+  const storageToken = await refreshTokenStorage.findByToken(incomingRefreshToken);
+
+  if (!storageToken) {
+    return res
+      .status(401)
+      .json({ status: 'fail', message: 'Invalid refresh token. Please log in again.' });
+  }
+
+  const isReusedToken = await refreshTokenStorage.isReusedToken(incomingRefreshToken);
+
+  if (isReusedToken) {
+    await refreshTokenStorage.deleteAll(user._id);
+    return res
+      .status(401)
+      .json({ status: 'fail', message: 'Security breach detected. Please log in again.' });
+  }
+
+  if (storageToken.expiresAt < Date.now()) {
+    return res
+      .status(401)
+      .json({ status: 'fail', message: 'Expired refresh token. Please log in again.' });
+  }
+
+  const consumeToken = await refreshTokenStorage.markUsed(incomingRefreshToken);
+
+  if (!consumeToken) {
+    return res
+      .status(401)
+      .json({ status: 'fail', message: 'Invalid refresh token. Please log in again.' });
+  }
+
+  const accessToken = createTokenV1(
+    { userId: user._id, role: user.role, deviceId: decoded.deviceId },
+    'access',
+  );
+  const newRefreshToken = createTokenV1(
+    { userId: user._id, role: user.role, deviceId: decoded.deviceId },
+    'refresh',
+  );
+
+  await refreshTokenStorage.store(user._id, newRefreshToken, decoded.deviceId);
+
+  res
+    .status(200)
+    .cookie('refreshToken', newRefreshToken, cookieOptions)
+    .json({ status: 'success', message: 'Access token refreshed successfully.', accessToken });
 };
