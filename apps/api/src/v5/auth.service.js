@@ -29,6 +29,25 @@ class RefreshTokenStorage {
     this.storage.set(hashToken, tokenData);
   }
 
+  findByToken(token) {
+    const hashToken = this.#hashRefreshToken(token);
+    return this.storage.get(hashToken) || null;
+  }
+
+  markUsed(token) {
+    const hashToken = this.#hashRefreshToken(token);
+    const tokenData = this.storage.get(hashToken);
+
+    if (!tokenData) return false;
+    if (tokenData.expiresAt < Date.now()) return false;
+    if (tokenData.isUsed) return false;
+
+    tokenData.isUsed = true;
+    tokenData.usedAt = Date.now();
+
+    return true;
+  }
+
   #convertUserIdToString(userId) {
     return userId.toString();
   }
