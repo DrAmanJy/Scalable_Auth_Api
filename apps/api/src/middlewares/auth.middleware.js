@@ -1,5 +1,6 @@
 import bcrypt from 'bcrypt';
 import User from '../models/user.js';
+import User2 from '../models/userV2.js';
 import { verifyToken } from '../utils/token.js';
 import sessionService from '../v2/session.service.js';
 
@@ -107,7 +108,7 @@ export const requireDeviceBoundAuth = async (req, res, next) => {
     return res.status(401).json({ status: 'fail', message: 'Not authorized' });
   }
 
-  const user = await User.findById(decoded.userId).lean();
+  const user = await User2.findById(decoded.userId);
   if (!user) {
     return res.status(401).json({ status: 'fail', message: 'Not authorized' });
   }
