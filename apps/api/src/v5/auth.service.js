@@ -97,6 +97,34 @@ class RefreshTokenStorage {
     return this.userTokenIndex.get(stringUserId) || null;
   }
 
+  cleanup() {
+    const now = Date.now();
+
+    for (const [hashToken, tokenData] of this.storage) {
+      let shouldDelete = false;
+
+      if (tokenData.expiresAt < now) {
+        shouldDelete = true;
+      } else if (tokenData.isUsed && tokenData.usedAt) {
+        const graceEnd = tokenData.usedAt + 30 * 60 * 1000;
+        if (graceEnd < now) shouldDelete = true;
+      }
+
+      if (shouldDelete) {
+        const userTokensSet = this.userTokenIndex.get(tokenData.userId);
+
+        if (userTokensSet) {
+          userTokensSet.delete(hashToken);
+          if (userTokensSet.size === 0) {
+            this.userTokenIndex.delete(tokenData.userId);
+          }
+        }
+
+        this.storage.delete(hashToken);
+      }
+    }
+  }
+
   #convertUserIdToString(userId) {
     return userId.toString();
   }
