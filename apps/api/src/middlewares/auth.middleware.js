@@ -60,7 +60,7 @@ export const requireSessionAuth = async (req, res, next) => {
   next();
 };
 
-export const isAuthV3 = async (req, res, next) => {
+export const requireAccessToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer '))
