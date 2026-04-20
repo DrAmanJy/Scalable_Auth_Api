@@ -176,3 +176,29 @@ export const logout = async (req, res) => {
     })
     .json({ status: 'success', message: 'User successfully logged out.' });
 };
+
+export const logoutAll = async (req, res) => {
+  const incomingRefreshToken = req.cookies.refreshToken;
+
+  if (!incomingRefreshToken) {
+    return res.status(401).json({ status: 'fail', message: 'Refresh token is missing.' });
+  }
+
+  const decoded = await verifyToken(incomingRefreshToken, 'refresh');
+
+  if (!decoded) {
+    return res.status(401).json({ status: 'fail', message: 'Invalid refresh token.' });
+  }
+
+  await refreshTokenStorage.deleteAll(decoded.userId);
+
+  res
+    .status(200)
+    .clearCookie('refreshToken', cookieOptions)
+    .clearCookie('deviceId', {
+      httpOnly: false,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+    })
+    .json({ status: 'success', message: 'User successfully logged out from all devices.' });
+};
