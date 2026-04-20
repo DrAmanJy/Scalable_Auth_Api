@@ -3,7 +3,7 @@ import User from '../models/user.js';
 import { verifyToken } from '../utils/token.js';
 import sessionService from '../v2/session.service.js';
 
-export const isAuthV1 = async (req, res, next) => {
+export const requireBasicAuth = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Basic '))
     return res
