@@ -21,8 +21,8 @@ export const register = async (req, res) => {
       return res.status(400).json({ status: 'fail', message: 'Email already exists' });
     } else throw err;
   }
-  const accessToken = createTokenV1({ id: user.id });
-  const refreshToken = createTokenV1({ id: user.id }, 'refresh');
+  const accessToken = createTokenV1({ userId: user.id });
+  const refreshToken = createTokenV1({ userId: user.id }, 'refresh');
 
   const hashRefreshToken = await hashToken(refreshToken);
 
@@ -50,8 +50,8 @@ export const login = async (req, res) => {
   if (!isValidPass)
     return res.status(400).json({ status: 'fail', message: 'Invalid email or password' });
 
-  const accessToken = createTokenV1({ id: user.id });
-  const refreshToken = createTokenV1({ id: user.id }, 'refresh');
+  const accessToken = createTokenV1({ userId: user.id });
+  const refreshToken = createTokenV1({ userId: user.id }, 'refresh');
 
   const hashRefreshToken = await hashToken(refreshToken);
 
@@ -66,7 +66,7 @@ export const login = async (req, res) => {
 };
 
 export const logoutUser = async (req, res) => {
-  const existingUser = await User.findById(req.user.id);
+  const existingUser = await User.findById(req.user._id);
 
   if (existingUser) {
     existingUser.refreshToken = undefined;
@@ -102,7 +102,7 @@ export const refreshAccessToken = async (req, res) => {
     });
   }
 
-  const user = await User.findById(decoded.id).select('+refreshToken');
+  const user = await User.findById(decoded.userId).select('+refreshToken');
 
   if (!user || !user.refreshToken) {
     return res.status(401).json({
@@ -120,8 +120,8 @@ export const refreshAccessToken = async (req, res) => {
     });
   }
 
-  const accessToken = createTokenV1({ id: user.id }, 'access');
-  const newRefreshToken = createTokenV1({ id: user.id }, 'refresh');
+  const accessToken = createTokenV1({ userId: user.id }, 'access');
+  const newRefreshToken = createTokenV1({ userId: user.id }, 'refresh');
 
   user.refreshToken = await hashToken(newRefreshToken);
   await user.save();
