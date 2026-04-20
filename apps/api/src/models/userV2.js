@@ -1,0 +1,56 @@
+import { Schema, model } from 'mongoose';
+
+const userSchema = new Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    email: {
+      type: String,
+      unique: true,
+      lowercase: true,
+      trim: true,
+      required: true,
+      validate: {
+        validator: function (v) {
+          return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v);
+        },
+        message: (props) => `${props.value} is not valid email`,
+      },
+    },
+    password: {
+      type: String,
+      required: true,
+      min: [6, 'Password must be 6 char long'],
+      select: false,
+    },
+    role: { type: String, enum: ['user', 'admin', 'owner'], default: 'user' },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
+    versionKey: false,
+    toJSON: {
+      virtuals: true,
+      transform: function (_, ret) {
+        delete ret._id;
+        delete ret.password;
+        delete ret.refreshToken;
+        return ret;
+      },
+    },
+    toObject: {
+      virtuals: true,
+      transform: function (_, ret) {
+        delete ret.password;
+        delete ret.refreshToken;
+        return ret;
+      },
+    },
+  },
+);
+
+const User = model('User2', userSchema);
+
+export default User;
