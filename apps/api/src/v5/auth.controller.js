@@ -1,6 +1,6 @@
 import User from '../models/userV2';
 import crypto from 'crypto';
-import { createTokenV1} from '../utils/token';
+import { createTokenV1, verifyHash } from '../utils/token';
 import refreshTokenStorage from './auth.service';
 
 const cookieOptions = {
@@ -46,3 +46,36 @@ export const register = async (req, res) => {
     .json({ status: 'success', message: 'User successfully registered', user, accessToken });
 };
 
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+  let deviceId = req.cookies.deviceId;
+
+  if (!deviceId || typeof deviceId !== 'string') {
+    deviceId = crypto.randomBytes(16).toString('hex');
+  }
+
+  const user = await User.findOne({ email }).select('+password');
+  if (!user) {
+    return res.status(401).json({ status: 'fail', message: 'Invalid email or password' });
+  }
+
+  const isValidPass = await verifyHash(password, user.password);
+  if (!isValidPass) {
+    return res.status(401).json({ status: 'fail', message: 'Invalid email or password' });
+  }
+
+  if (req.cookies?.refreshToken) {
+    await refreshTokenStorage.delete(req.cookies.refreshToken);
+  }
+
+  const accessToken = createTokenV1({ userId: user._id, role: user.role, deviceId }, 'access');
+  const refreshToken = createTokenV1({ userId: user._id, role: user.role, deviceId }, 'refresh');
+
+  await refreshTokenStorage.store(user._id, refreshToken, deviceId);
+
+  res
+    .status(200)
+    .cookie('deviceId', deviceId, deviceCookieOptions)
+    .cookie('refreshToken', refreshToken, cookieOptions)
+    .json({ status: 'success', message: 'User successfully logged in', user, accessToken });
+};
