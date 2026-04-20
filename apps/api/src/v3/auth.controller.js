@@ -1,6 +1,5 @@
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import User from '../models/user.js';
+import { createTokenV1, verifyHash } from '../utils/token.js';
 
 export const register = async (req, res) => {
   try {
@@ -14,9 +13,7 @@ export const register = async (req, res) => {
 
     const newUser = await User.create({ name, email, password });
 
-    const accessToken = jwt.sign({ id: newUser._id }, process.env.JWT_ACCESS_SECRET, {
-      expiresIn: process.env.JWT_ACCESS_EXPIRES_IN,
-    });
+    const accessToken = createTokenV1({ userId: newUser._id });
 
     res.status(201).json({
       status: 'success',
@@ -41,13 +38,11 @@ export const login = async (req, res) => {
     if (!existingUser)
       return res.status(400).json({ status: 'fail', message: 'Invalid email or password' });
 
-    const isValidPassword = await bcrypt.compare(password, existingUser.password);
+    const isValidPassword = await verifyHash(password, existingUser.password);
     if (!isValidPassword)
       return res.status(400).json({ status: 'fail', message: 'Invalid email or password' });
 
-    const accessToken = jwt.sign({ id: existingUser._id }, process.env.JWT_ACCESS_SECRET, {
-      expiresIn: process.env.JWT_ACCESS_EXPIRES_IN,
-    });
+    const accessToken = createTokenV1({ userId: existingUser._id });
 
     res.status(200).json({
       status: 'success',
