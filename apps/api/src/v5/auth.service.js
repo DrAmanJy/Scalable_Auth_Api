@@ -48,6 +48,40 @@ class RefreshTokenStorage {
     return true;
   }
 
+  delete(token) {
+    const hashToken = this.#hashRefreshToken(token);
+    const tokenData = this.storage.get(hashToken);
+
+    if (!tokenData) return false;
+
+    this.storage.delete(hashToken);
+
+    const userTokensSet = this.userTokenIndex.get(tokenData.userId);
+    if (userTokensSet) {
+      userTokensSet.delete(hashToken);
+
+      if (userTokensSet.size === 0) {
+        this.userTokenIndex.delete(tokenData.userId);
+      }
+    }
+
+    return true;
+  }
+
+  deleteAll(userId) {
+    const stringUserId = this.#convertUserIdToString(userId);
+    const tokens = this.userTokenIndex.get(stringUserId);
+
+    if (!tokens) return false;
+
+    for (const hashToken of tokens) {
+      this.storage.delete(hashToken);
+    }
+
+    this.userTokenIndex.delete(stringUserId);
+    return true;
+  }
+
   #convertUserIdToString(userId) {
     return userId.toString();
   }
