@@ -82,6 +82,21 @@ class RefreshTokenStorage {
     return true;
   }
 
+  isReusedToken(token) {
+    const hashToken = this.#hashRefreshToken(token);
+    const tokenData = this.storage.get(hashToken);
+
+    if (!tokenData) return false;
+    if (tokenData.expiresAt < Date.now()) return false;
+
+    return tokenData.isUsed;
+  }
+
+  getUserTokens(userId) {
+    const stringUserId = this.#convertUserIdToString(userId);
+    return this.userTokenIndex.get(stringUserId) || null;
+  }
+
   #convertUserIdToString(userId) {
     return userId.toString();
   }
