@@ -156,3 +156,23 @@ export const refreshToken = async (req, res) => {
     .cookie('refreshToken', newRefreshToken, cookieOptions)
     .json({ status: 'success', message: 'Access token refreshed successfully.', accessToken });
 };
+
+export const logout = async (req, res) => {
+  const incomingRefreshToken = req.cookies.refreshToken;
+
+  if (!incomingRefreshToken) {
+    return res.status(401).json({ status: 'fail', message: 'Refresh token is missing.' });
+  }
+
+  await refreshTokenStorage.delete(incomingRefreshToken);
+
+  res
+    .status(200)
+    .clearCookie('refreshToken', cookieOptions)
+    .clearCookie('deviceId', {
+      httpOnly: false,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+    })
+    .json({ status: 'success', message: 'User successfully logged out.' });
+};
