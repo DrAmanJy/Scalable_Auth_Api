@@ -1,21 +1,15 @@
-import FixedWindowLimiter from '../stores/fixedWindowLimiter.js';
+export const fixedWindowStrategy = ({ store, key, limit }) => {
+  const count = store.increment(key);
 
-export const fixedWindowCounter = (limit = 100, windowMs = 60_000) => {
-  const storage = new FixedWindowLimiter(windowMs);
+  if (count > limit) {
+    return {
+      allowed: false,
+      retryAfter: store.getRetryAfter(key) / 1000,
+    };
+  }
 
-  return (req, res, next) => {
-    const key = req.ip;
-
-    if (!key) {
-      return res.status(400).json({ status: 'fail', message: 'Key not found' });
-    }
-
-    const count = storage.increment(key);
-
-    if (count > limit) {
-      return res.status(429).json({ status: 'fail', message: 'Too Many Requests' });
-    }
-
-    next();
+  return {
+    allowed: true,
+    remaining: Math.max(0, limit - count),
   };
 };
