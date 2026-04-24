@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { globalLimiter } from './middlewares/rateLimiter/index.js';
 
 import swaggerUi from 'swagger-ui-express';
 import swaggerSpec from './config/swagger.js';
@@ -20,6 +21,8 @@ server.use(cors());
 server.use(express.json({ limit: '2kb' }));
 server.use(cookieParser());
 server.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+server.use(globalLimiter);
 
 server.get('/', (_, res) => {
   res.json({ message: 'Server is running' });
