@@ -1,4 +1,4 @@
-export default class SlidingWindowLogLimiter {
+export default class SlidingWindowLogStore {
   constructor(windowDuration) {
     this.storage = new Map();
     this.windowDuration = windowDuration;
@@ -17,9 +17,19 @@ export default class SlidingWindowLogLimiter {
     timestamps.push(now);
 
     this.storage.set(key, timestamps);
-    return {
-      count: timestamps.length,
-      timestamps,
-    };
+    return timestamps.length;
+  }
+
+  getRetryAfter(key) {
+    const timestamps = this.storage.get(key) || [];
+
+    const now = Date.now();
+    if (!timestamps || now >= timestamps[0] + this.windowDuration) {
+      return 0;
+    }
+
+    const oldest = timestamps[0];
+
+    return oldest + this.windowDuration - now;
   }
 }
