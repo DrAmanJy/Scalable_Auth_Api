@@ -4,7 +4,7 @@ export default class SlidingWindowLogStore {
     this.windowDuration = windowDuration;
   }
 
-  increment(key) {
+  increment(key, limit) {
     const now = Date.now();
     const windowStart = now - this.windowDuration;
 
@@ -14,7 +14,9 @@ export default class SlidingWindowLogStore {
       timestamps.shift();
     }
 
-    timestamps.push(now);
+    if (typeof limit !== 'number' || timestamps.length <= limit) {
+      timestamps.push(now);
+    }
 
     this.storage.set(key, timestamps);
     return timestamps.length;
