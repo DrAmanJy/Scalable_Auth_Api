@@ -1,10 +1,10 @@
-import { createRateLimiter } from '.';
+import { createRateLimiter } from './createRateLimiter.js';
 
 import FixedWindowStore from './stores/fixedWindowLimiter.js';
 import SlidingWindowLogStore from './stores/slidingWindowLogLimiter.js';
 
 import { fixedWindowStrategy } from './strategies/fixedWindow.js';
-import { slidingWindowStrategy } from './strategies/SlidingWindowLog.js';
+import { slidingWindowStrategy } from './strategies/slidingWindowLog.js';
 
 export const globalLimiter = createRateLimiter({
   strategy: fixedWindowStrategy,
