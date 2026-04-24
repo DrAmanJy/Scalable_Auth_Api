@@ -21,4 +21,15 @@ export default class FixedWindowLimiter {
     entry.count++;
     return entry.count;
   }
+  getRetryAfter(key) {
+    const now = Date.now();
+    const entry = this.storage.get(key);
+
+    if (!entry || now >= entry.start + this.windowDuration) {
+      return 0;
+    }
+
+    const expirationTime = entry.start + this.windowDuration;
+    return expirationTime - now;
+  }
 }
