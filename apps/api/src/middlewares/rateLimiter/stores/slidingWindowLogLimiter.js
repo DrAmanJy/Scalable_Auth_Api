@@ -4,7 +4,7 @@ export default class SlidingWindowLogStore {
     this.windowDuration = windowDuration;
   }
 
-  increment(key, limit) {
+  increment(key) {
     const now = Date.now();
     const windowStart = now - this.windowDuration;
 
@@ -14,24 +14,21 @@ export default class SlidingWindowLogStore {
       timestamps.shift();
     }
 
-    if (typeof limit !== 'number' || timestamps.length <= limit) {
-      timestamps.push(now);
-    }
+    timestamps.push(now);
 
     this.storage.set(key, timestamps);
     return timestamps.length;
   }
 
   getRetryAfter(key) {
-    const timestamps = this.storage.get(key) || [];
+    const timestamps = this.storage.get(key);
+    if (!timestamps || timestamps.length === 0) return 0;
 
     const now = Date.now();
-    if (!timestamps || now >= timestamps[0] + this.windowDuration) {
-      return 0;
-    }
-
     const oldest = timestamps[0];
 
-    return oldest + this.windowDuration - now;
+    const retryAfterMs = oldest + this.windowDuration - now;
+
+    return retryAfterMs > 0 ? retryAfterMs : 0;
   }
 }
