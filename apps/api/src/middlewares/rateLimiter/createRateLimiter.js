@@ -3,7 +3,6 @@ export const createRateLimiter = ({
   strategy,
   store,
   limit,
-  windowMs,
   keyGenerator,
 }) => {
   return (req, res, next) => {
@@ -19,7 +18,7 @@ export const createRateLimiter = ({
       return res.status(400).json({ status: 'fail', message: 'Key not found' });
     }
 
-    const result = strategy({ store, key, limit, windowMs });
+    const result = strategy({ store, key, limit });
 
     if (!result || typeof result.allowed !== 'boolean') {
       return res.status(500).json({ status: 'fail', message: 'Rate limiter error' });
