@@ -1,4 +1,11 @@
-export const createRateLimiter = ({ strategy, store, limit, windowMs, keyGenerator }) => {
+export const createRateLimiter = ({
+  message = 'Too many login attempts',
+  strategy,
+  store,
+  limit,
+  windowMs,
+  keyGenerator,
+}) => {
   return (req, res, next) => {
     let key;
 
@@ -32,7 +39,7 @@ export const createRateLimiter = ({ strategy, store, limit, windowMs, keyGenerat
 
       return res.status(429).json({
         status: 'fail',
-        message: 'Too Many Requests',
+        message,
         retryAfter,
       });
     }
