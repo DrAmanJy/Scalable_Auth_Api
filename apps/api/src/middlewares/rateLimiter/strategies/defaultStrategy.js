@@ -1,4 +1,4 @@
-export const fixedWindowStrategy = ({ store, key, limit }) => {
+export const defaultStrategy = ({ store, key, limit }) => {
   const count = store.increment(key);
 
   if (count > limit) {
