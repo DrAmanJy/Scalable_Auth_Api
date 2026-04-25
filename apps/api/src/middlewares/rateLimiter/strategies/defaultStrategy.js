@@ -1,18 +1,25 @@
 export const defaultStrategy = ({ store, key, limit }) => {
-  const count = store.increment(key);
+  const { count, remaining, retryAfterMs, allowed = true } = store.increment(key);
+  console.log({ count, remaining, retryAfterMs });
 
-  if (count > limit) {
-    const retryAfterMs = store.getRetryAfter(key);
-
+  if (!allowed) {
     return {
       allowed: false,
-      retryAfter: Math.max(1, Math.ceil(retryAfterMs / 1000)),
+      retryAfter: Math.ceil(retryAfterMs / 1000),
+      remaining: 0,
+    };
+  }
+
+  if (count > limit) {
+    return {
+      allowed: false,
+      retryAfter: Math.ceil(retryAfterMs / 1000),
       remaining: 0,
     };
   }
 
   return {
     allowed: true,
-    remaining: Math.max(0, limit - count),
+    remaining,
   };
 };
