@@ -1,4 +1,4 @@
-export default class FixedWindow {
+export class FixedWindow {
   constructor(windowDuration, limit) {
     this.storage = new Map();
     this.windowDuration = windowDuration;

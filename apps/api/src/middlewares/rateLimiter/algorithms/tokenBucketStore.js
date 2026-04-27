@@ -1,4 +1,4 @@
-export default class TokenBucketStore {
+export class TokenBucketStore {
   constructor(capacity, refillRate, refillIntervalMs) {
     this.storage = new Map();
     this.capacity = capacity;
