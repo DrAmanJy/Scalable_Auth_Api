@@ -37,6 +37,9 @@ server.use(errorHandler);
 
 await connectDb();
 server.listen(3000, (err) => {
-  if (err) console.log('Failed to start server', err.message);
+  if (err) {
+    console.log('Failed to start server', err.message);
+    return;
+  }
   console.log('Server is running on Port: 3000');
 });

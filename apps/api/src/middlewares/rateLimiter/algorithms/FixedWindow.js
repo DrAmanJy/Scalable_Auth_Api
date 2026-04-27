@@ -1,3 +1,5 @@
+import { getRedisClient } from '../../../utils/redis.js';
+
 export class FixedWindow {
   constructor(windowDuration, limit) {
     this.storage = new Map();
@@ -46,6 +48,41 @@ export class FixedWindow {
       allowed: true,
       remaining: this.limit - entry.count,
       retryAfterMs: 0,
+    };
+  }
+}
+
+export class FixedWindowRedis {
+  constructor(windowDuration, limit) {
+    this.redisClientPromise = getRedisClient();
+    this.windowDuration = windowDuration;
+    this.limit = limit;
+  }
+
+  async increment(key) {
+    const redis = await this.redisClientPromise;
+
+    const redisKey = `fixedWindow:${key}`;
+
+    const currentCount = await redis.incr(redisKey);
+
+    if (currentCount === 1) {
+      await redis.pExpire(redisKey, this.windowDuration);
+    }
+
+    const allowed = currentCount <= this.limit;
+    const remaining = Math.max(0, this.limit - currentCount);
+
+    let retryAfterMs = 0;
+    if (!allowed) {
+      retryAfterMs = await redis.pTTL(redisKey);
+    }
+
+    return {
+      count: currentCount,
+      allowed,
+      remaining,
+      retryAfterMs,
     };
   }
 }
