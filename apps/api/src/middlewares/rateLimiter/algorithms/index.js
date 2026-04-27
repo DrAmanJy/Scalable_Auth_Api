@@ -1,3 +1,3 @@
-export * from './fixedWindowLimiter.js';
-export * from './slidingWindowLogLimiter.js';
-export * from './tokenBucketStore.js';
+export * from './FixedWindow.js';
+export * from './SlidingWindowLog.js';
+export * from './TokenBucket.js';
