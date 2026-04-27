@@ -132,3 +132,50 @@ export class StrictSlidingWindowRedis {
     };
   }
 }
+
+export class StandardSlidingWindowRedis {
+  constructor(windowDuration, limit) {
+    this.redisClientPromise = getRedisClient();
+    this.windowDuration = windowDuration;
+    this.limit = limit;
+  }
+
+  async increment(key) {
+    const redis = await this.redisClientPromise;
+
+    const redisKey = `StrictSlidingWindow:${key}`;
+    const now = Date.now();
+    const windowStart = now - this.windowDuration;
+
+    await redis.zRemRangeByScore(redisKey, 0, windowStart);
+    const currentCount = await redis.zCard(redisKey);
+
+    const allowed = currentCount < this.limit;
+    const remaining = Math.max(0, this.limit - currentCount - (allowed ? 1 : 0));
+    let retryAfterMs = 0;
+
+    if (allowed) {
+      const uniqueValue = `${now}-${Math.random()}`;
+
+      await redis.zAdd(redisKey, [{ score: now, value: uniqueValue }]);
+
+      await redis.pExpire(redisKey, this.windowDuration);
+    } else {
+      const oldestRequest = await redis.zRangeWithScores(redisKey, 0, 0);
+
+      if (oldestRequest && oldestRequest.length > 0) {
+        const oldestTimestamp = oldestRequest[0].score;
+        retryAfterMs = oldestTimestamp + this.windowDuration - now;
+      } else {
+        retryAfterMs = this.windowDuration;
+      }
+    }
+
+    return {
+      count: allowed ? currentCount + 1 : currentCount,
+      allowed,
+      remaining,
+      retryAfterMs,
+    };
+  }
+}
