@@ -1,3 +1,5 @@
+import { getRedisClient } from '../../../utils/redis.js';
+
 export class TokenBucket {
   constructor(capacity, refillRate, refillIntervalMs) {
     this.storage = new Map();
@@ -51,6 +53,58 @@ export class TokenBucket {
       count: this.capacity,
       allowed: false,
       remaining: entry.tokens,
+      retryAfterMs,
+    };
+  }
+}
+
+export class TokenBucketRedis {
+  constructor(capacity, refillRate, refillIntervalMs) {
+    this.redisClientPromise = getRedisClient();
+    this.capacity = capacity;
+    this.refillRate = refillRate;
+    this.refillIntervalMs = refillIntervalMs;
+  }
+
+  async increment(key) {
+    const now = Date.now();
+    const redis = await this.redisClientPromise;
+    const redisKey = `tokenBucket:${key}`;
+
+    let bucket = await redis.json.get(redisKey);
+
+    if (!bucket) {
+      bucket = { tokens: this.capacity, lastRefill: now };
+    }
+
+    const timePassed = now - bucket.lastRefill;
+    const intervalsPassed = Math.floor(timePassed / this.refillIntervalMs);
+
+    if (intervalsPassed > 0) {
+      const tokensToAdd = intervalsPassed * this.refillRate;
+      bucket.tokens = Math.min(this.capacity, bucket.tokens + tokensToAdd);
+      bucket.lastRefill = bucket.lastRefill + intervalsPassed * this.refillIntervalMs;
+    }
+
+    let retryAfterMs = 0;
+    let allowed = false;
+
+    if (bucket.tokens > 0) {
+      bucket.tokens -= 1;
+      allowed = true;
+    } else {
+      const remainder = timePassed % this.refillIntervalMs;
+      retryAfterMs = remainder === 0 ? this.refillIntervalMs : this.refillIntervalMs - remainder;
+    }
+
+    await redis.json.set(redisKey, '$', bucket);
+
+    await redis.pExpire(redisKey, this.capacity * this.refillIntervalMs);
+
+    return {
+      count: this.capacity - bucket.tokens,
+      allowed,
+      remaining: bucket.tokens,
       retryAfterMs,
     };
   }
