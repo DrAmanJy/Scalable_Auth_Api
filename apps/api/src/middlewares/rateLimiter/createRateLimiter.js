@@ -3,7 +3,7 @@ export const createRateLimiter = ({
   strategy,
   keyGenerator,
 }) => {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     let key;
 
     try {
@@ -16,7 +16,7 @@ export const createRateLimiter = ({
       return res.status(400).json({ status: 'fail', message: 'Key not found' });
     }
 
-    const result = strategy.increment(key);
+    const result = await strategy.increment(key);
 
     if (!result || typeof result.allowed !== 'boolean') {
       return res.status(500).json({ status: 'fail', message: 'Rate limiter error' });
