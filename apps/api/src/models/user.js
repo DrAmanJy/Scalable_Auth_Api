@@ -23,6 +23,11 @@ const userSchema = new Schema(
       min: [6, 'Password must be 6 char long'],
       select: false,
     },
+    isVerified: { type: Boolean, default: false },
+    verification: {
+      code: { type: String, select: false },
+      expiresAt: { type: Date },
+    },
     refreshToken: { type: String, select: false },
   },
   {
@@ -34,6 +39,7 @@ const userSchema = new Schema(
         delete ret._id;
         delete ret.password;
         delete ret.refreshToken;
+        delete ret.verification;
         return ret;
       },
     },
