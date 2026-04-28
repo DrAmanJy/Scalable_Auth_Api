@@ -27,6 +27,7 @@ const userSchema = new Schema(
     verification: {
       code: { type: String, select: false },
       expiresAt: { type: Date },
+      createdAt: { type: Date },
     },
     refreshToken: { type: String, select: false },
   },
