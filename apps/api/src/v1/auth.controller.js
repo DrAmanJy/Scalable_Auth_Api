@@ -49,6 +49,57 @@ export const register = async (req, res) => {
   });
 };
 
+export const verify = async (req, res) => {
+  const { email, otp } = req.body;
+
+  const user = await User.findOne({ email }).select('+verification.code');
+
+  if (!user) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Invalid email or OTP',
+    });
+  }
+
+  if (user.isVerified) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Account already verified',
+    });
+  }
+
+  const isExpired = user.verification?.expiresAt < Date.now();
+
+  if (isExpired) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'OTP has expired. Please request a new one.',
+    });
+  }
+
+  const isValidOtp = await verifyOtp(otp, user.verification?.code);
+
+  if (!isValidOtp) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Invalid OTP',
+    });
+  }
+
+  user.isVerified = true;
+  user.verification = undefined;
+
+  await user.save();
+
+  res.status(200).json({
+    status: 'success',
+    message: 'Account verified successfully.',
+  });
+};
+
+
+
+
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
