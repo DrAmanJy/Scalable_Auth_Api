@@ -35,7 +35,7 @@ export const register = async (req, res) => {
 
   try {
     await sendEmail({ to: user.email, subject: 'Verify your account', html });
-  } catch (err) {
+  } catch (_) {
     await User.findByIdAndDelete(user._id);
     return res.status(500).json({
       status: 'fail',
@@ -140,7 +140,7 @@ export const resendOtp = async (req, res) => {
       subject: 'Verify your account',
       html,
     });
-  } catch (err) {
+  } catch (_) {
     user.verification = undefined;
     await user.save();
 
