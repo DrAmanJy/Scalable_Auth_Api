@@ -127,6 +127,83 @@ export const verify = async (req, res) => {
   });
 };
 
+export const resendOtp = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Email is required',
+    });
+  }
+
+  const user = await User.findOne({ email }).select('+verification.code');
+
+  if (!user) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Invalid email',
+    });
+  }
+
+  if (user.isVerified) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Account already verified',
+    });
+  }
+
+  const now = Date.now();
+  const COOLDOWN_MS = 60 * 1000;
+
+  const createdAt = user.verification?.createdAt;
+
+  if (createdAt && now - createdAt < COOLDOWN_MS) {
+    const retryAfter = Math.ceil((COOLDOWN_MS - (now - createdAt)) / 1000);
+
+    return res.status(429).json({
+      status: 'fail',
+      message: `Please wait ${retryAfter}s before requesting a new OTP`,
+      retryAfter,
+    });
+  }
+
+  const otp = generateOtp(6);
+  const hash = await hashOtp(otp);
+  const html = getOtpHtml(otp);
+
+  const expiresAt = now + Number(process.env.OTP_EXPIRES_MINUTES) * 60 * 1000;
+
+  user.verification = {
+    code: hash,
+    expiresAt,
+    createdAt: now,
+  };
+
+  await user.save();
+
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Verify your account',
+      html,
+    });
+  } catch {
+    user.verification = undefined;
+    await user.save();
+
+    return res.status(500).json({
+      status: 'fail',
+      message: 'Failed to send verification email. Please try again.',
+    });
+  }
+
+  res.status(200).json({
+    status: 'success',
+    message: 'A new verification code has been sent to your email.',
+  });
+};
+
 export const login = async (req, res) => {
   const { email, password } = req.body;
 
