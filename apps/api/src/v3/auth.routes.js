@@ -26,6 +26,10 @@ const router = express.Router();
  */
 router.post('/register', authController.register);
 
+router.post('/verify', authController.verify);
+
+router.post('/resend-otp', authController.resendOtp);
+
 router.post('/login', authController.login);
 
 router.get('/me', requireAccessToken, authController.getMe);
