@@ -57,7 +57,7 @@ export const register = async (req, res) => {
       subject: 'Verify your account',
       html,
     });
-  } catch (err) {
+  } catch (_) {
     await user.deleteOne();
     return res.status(500).json({
       status: 'fail',
