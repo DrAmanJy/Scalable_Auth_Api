@@ -121,7 +121,9 @@ export const verify = async (req, res) => {
 
   await user.save();
 
-  res.status(200).json({
+  const sessionId = sessionService.createSession(user._id);
+
+  res.cookie('sessionId', sessionId, cookieOptions).status(200).json({
     status: 'success',
     message: 'Account verified successfully.',
   });
