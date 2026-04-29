@@ -1,4 +1,7 @@
 import User from '../models/user.js';
+import { sendEmail } from '../services/email.js';
+import { getOtpHtml } from '../templates/email/otp.template.js';
+import { generateOtp, hashOtp } from '../utils/otp.js';
 import { createTokenV1, hashToken, verifyHash, verifyToken } from '../utils/token.js';
 import bcrypt from 'bcrypt';
 
@@ -21,6 +24,26 @@ export const register = async (req, res) => {
       return res.status(400).json({ status: 'fail', message: 'Email already exists' });
     } else throw err;
   }
+
+  const otp = generateOtp(6);
+  const hash = await hashOtp(otp);
+  const html = getOtpHtml();
+  const expireAt = Date.now() + Number(process.env.OTP_EXPIRES_MINUTES) * 60 * 1000;
+
+  user.verification = { code: hash, expireAt, createdAt: Date.now() };
+
+  await user.save();
+
+  try {
+    await sendEmail({ to: user.email, subject: '', html });
+  } catch (_) {
+    await user.deleteOne();
+    return res.status(500).json({
+      status: 'fail',
+      message: 'Failed to send verification email. Please try again.',
+    });
+  }
+
   const accessToken = createTokenV1({ userId: user.id });
   const refreshToken = createTokenV1({ userId: user.id }, 'refresh');
 
@@ -44,6 +67,13 @@ export const login = async (req, res) => {
   const user = await User.findOne({ email }).select('+password');
 
   if (!user) return res.status(400).json({ status: 'fail', message: 'Invalid email or password' });
+
+  if (!user.isVerified) {
+    return res.status(403).json({
+      status: 'fail',
+      message: 'Please verify your account before logging in',
+    });
+  }
 
   const isValidPass = bcrypt.compare(password, user.password);
 
