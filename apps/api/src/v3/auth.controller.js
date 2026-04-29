@@ -1,4 +1,7 @@
 import User from '../models/user.js';
+import { sendEmail } from '../services/email.js';
+import { getOtpHtml } from '../templates/email/otp.template.js';
+import { generateOtp, hashOtp, verifyOtp } from '../utils/otp.js';
 import { createTokenV1, verifyHash } from '../utils/token.js';
 
 export const register = async (req, res) => {
@@ -12,6 +15,24 @@ export const register = async (req, res) => {
       return res.status(400).json({ status: 'fail', message: 'Email already exists' });
 
     const newUser = await User.create({ name, email, password });
+
+    const otp = generateOtp(6);
+    const hash = await hashOtp(otp);
+    const html = getOtpHtml(otp);
+    const expireAt = Date.now() + Number(process.env.OTP_EXPIRES_MINUTES) * 60 * 1000;
+
+    newUser.verification = { code: hash, expireAt, createdAt: Date.now() };
+
+    await newUser.save();
+    try {
+      await sendEmail({ to: newUser.email, subject: 'Verify your account', html });
+    } catch (_) {
+      await newUser.deleteOne();
+      return res.status(500).json({
+        status: 'fail',
+        message: 'Failed to send verification email. Please try again.',
+      });
+    }
 
     const accessToken = createTokenV1({ userId: newUser._id });
 
@@ -38,6 +59,12 @@ export const login = async (req, res) => {
     if (!existingUser)
       return res.status(400).json({ status: 'fail', message: 'Invalid email or password' });
 
+    if (!existingUser.isVerified) {
+      return res.status(403).json({
+        status: 'fail',
+        message: 'Please verify your account before logging in',
+      });
+    }
     const isValidPassword = await verifyHash(password, existingUser.password);
     if (!isValidPassword)
       return res.status(400).json({ status: 'fail', message: 'Invalid email or password' });
