@@ -77,9 +77,12 @@ export const verify = async (req, res) => {
 
   await user.save();
 
+  const accessToken = createTokenV1({ userId: user._id });
+
   res.status(200).json({
     status: 'success',
     message: 'Account verified successfully.',
+    accessToken,
   });
 };
 
