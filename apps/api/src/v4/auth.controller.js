@@ -1,7 +1,7 @@
 import User from '../models/user.js';
 import { sendEmail } from '../services/email.js';
 import { getOtpHtml } from '../templates/email/otp.template.js';
-import { generateOtp, hashOtp } from '../utils/otp.js';
+import { generateOtp, hashOtp, verifyOtp } from '../utils/otp.js';
 import { createTokenV1, hashToken, verifyHash, verifyToken } from '../utils/token.js';
 import bcrypt from 'bcrypt';
 
@@ -93,6 +93,45 @@ export const login = async (req, res) => {
     .status(200)
     .cookie('refreshToken', refreshToken, cookieOptions)
     .json({ status: 'success', message: 'User successfully login', user, accessToken });
+};
+
+export const verify = async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp)
+    return res.status(400).json({ status: 'fail', message: 'Email and opt required' });
+
+  const user = await User.findOne({ email }).select('+verification.code');
+
+  if (!user) return res.status(400).json({ status: 'fail', message: 'Invalid email or OTP' });
+
+  if (user.isVerified)
+    return res.status(400).json({ status: 'fail', message: 'Account already verified' });
+
+  const isExpired = Date.now() > user.verification?.expireAt;
+  if (isExpired)
+    return res
+      .status(400)
+      .json({ status: 'fail', message: 'OTP has expired. Please request a new one.' });
+
+  const isValidOtp = await verifyOtp(otp, user.verification?.code);
+
+  if (!isValidOtp) return res.status(400).json({ status: 'fail', message: 'Invalid OTP' });
+
+  const accessToken = createTokenV1({ userId: user.id });
+  const refreshToken = createTokenV1({ userId: user.id }, 'refresh');
+
+  const hashRefreshToken = await hashToken(refreshToken);
+
+  user.refreshToken = hashRefreshToken;
+  user.isVerified = true;
+  user.verification = undefined;
+
+  await user.save();
+
+  return res
+    .status(200)
+    .json({ status: 'success', message: 'Account verified successfully.', accessToken });
 };
 
 export const logoutUser = async (req, res) => {
