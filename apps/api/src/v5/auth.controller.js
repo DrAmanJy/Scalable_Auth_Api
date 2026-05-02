@@ -2,6 +2,9 @@ import User from '../models/userV2.js';
 import crypto from 'crypto';
 import { createTokenV1, verifyHash, verifyToken } from '../utils/token.js';
 import refreshTokenStorage from './auth.service.js';
+import { generateOtp, hashOtp, verifyOtp } from '../utils/otp.js';
+import { getOtpHtml } from '../templates/email/otp.template.js';
+import { sendEmail } from '../services/email.js';
 
 const cookieOptions = {
   httpOnly: true,
@@ -18,32 +21,41 @@ const deviceCookieOptions = {
 
 export const register = async (req, res) => {
   const { name, email, password } = req.body;
-  let deviceId = req.cookies.deviceId;
-
-  if (!deviceId || typeof deviceId !== 'string') {
-    deviceId = crypto.randomBytes(16).toString('hex');
-  }
 
   let user;
   try {
     user = await User.create({ name, email, password });
   } catch (err) {
     if (err.code === 11000) {
-      return res.status(400).json({ status: 'fail', message: 'Email already exists' });
+      return res.status(409).json({ status: 'fail', message: 'Email already exists' });
     }
     throw err;
   }
 
-  const accessToken = createTokenV1({ userId: user._id, role: user.role, deviceId }, 'access');
-  const refreshToken = createTokenV1({ userId: user._id, role: user.role, deviceId }, 'refresh');
+  const otp = generateOtp(6);
+  const hash = await hashOtp(otp);
+  const html = getOtpHtml(otp);
+  const expiresAt = Number(process.env.OTP_EXPIRES_MINUTES) * 60 * 1000;
 
-  await refreshTokenStorage.store(user._id, refreshToken, deviceId);
+  user.verification = {
+    code: hash,
+    expiresAt,
+    createdAt: Date.now(),
+  };
+  await user.save();
 
-  res
-    .status(201)
-    .cookie('deviceId', deviceId, deviceCookieOptions)
-    .cookie('refreshToken', refreshToken, cookieOptions)
-    .json({ status: 'success', message: 'User successfully registered', user, accessToken });
+  try {
+    await sendEmail({ to: user.email, subject: 'Verify your account', html });
+  } catch (_) {
+    await user.deleteOne();
+
+    return res.status(500).json({
+      status: 'fail',
+      message: 'Failed to send verification email. Please try again.',
+    });
+  }
+
+  res.status(201).json({ status: 'success', message: 'User successfully registered' });
 };
 
 export const login = async (req, res) => {
@@ -58,6 +70,12 @@ export const login = async (req, res) => {
   if (!user) {
     return res.status(401).json({ status: 'fail', message: 'Invalid email or password' });
   }
+
+  if (!user.isVerified)
+    return res.status(403).json({
+      status: 'fail',
+      message: 'Please verify your account before logging in',
+    });
 
   const isValidPass = await verifyHash(password, user.password);
   if (!isValidPass) {
@@ -78,6 +96,108 @@ export const login = async (req, res) => {
     .cookie('deviceId', deviceId, deviceCookieOptions)
     .cookie('refreshToken', refreshToken, cookieOptions)
     .json({ status: 'success', message: 'User successfully logged in', user, accessToken });
+};
+
+export const verify = async (req, res) => {
+  const { email, otp } = req.body;
+
+  let deviceId = req.cookies.deviceId;
+
+  if (!deviceId || typeof deviceId !== 'string') {
+    deviceId = crypto.randomBytes(16).toString('hex');
+  }
+
+  if (!email || !otp)
+    return res.status(400).json({ status: 'fail', message: 'Email and OTP are required' });
+
+  const user = await User.findOne({ email }).select('+verification.code');
+
+  if (!user)
+    return res.status(404).json({ status: 'fail', message: 'User not found or invalid email' });
+
+  if (user.isVerified)
+    return res.status(409).json({ status: 'fail', message: 'Account already verified' });
+
+  const isExpired = Date.now() > user.verification?.expiresAt;
+  if (isExpired)
+    return res
+      .status(400)
+      .json({ status: 'fail', message: 'OTP has expired. Please request a new one.' });
+
+  const isValidOtp = await verifyOtp(otp, user.verification?.code);
+
+  if (!isValidOtp) return res.status(400).json({ status: 'fail', message: 'Invalid OTP' });
+
+  if (req.cookies?.refreshToken) {
+    await refreshTokenStorage.delete(req.cookies.refreshToken);
+  }
+
+  const accessToken = createTokenV1({ userId: user._id, role: user.role, deviceId }, 'access');
+  const refreshToken = createTokenV1({ userId: user._id, role: user.role, deviceId }, 'refresh');
+
+  await refreshTokenStorage.store(user._id, refreshToken, deviceId);
+
+  user.isVerified = true;
+  user.verification = undefined;
+
+  await user.save();
+
+  return res
+    .status(200)
+    .cookie('deviceId', deviceId, deviceCookieOptions)
+    .cookie('refreshToken', refreshToken, cookieOptions)
+    .json({ status: 'success', message: 'Account verified successfully.', accessToken });
+};
+
+export const resendOtp = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) return res.status(400).json({ status: 'fail', message: 'Email is required' });
+
+  const user = await User.findOne({ email }).select('+verification.code');
+
+  if (!user)
+    return res.status(404).json({ status: 'fail', message: 'User not found or invalid email' });
+  if (user.isVerified)
+    return res.status(409).json({ status: 'fail', message: 'Account already verified' });
+  const now = Date.now();
+  const COOLDOWN_MS = 60_000;
+  const createdAt = user.verification?.createdAt;
+
+  if (createdAt && now - createdAt < COOLDOWN_MS) {
+    const retryAfter = Math.ceil((COOLDOWN_MS - (now - createdAt)) / 1000);
+
+    return res.status(429).json({
+      status: 'fail',
+      message: `Please wait ${retryAfter}s before requesting a new OTP`,
+      retryAfter,
+    });
+  }
+
+  const otp = generateOtp(6);
+  const hash = await hashOtp(otp);
+  const html = getOtpHtml(otp);
+
+  const expiresAt = now + Number(process.env.OTP_EXPIRES_MINUTES) * 60 * 1000;
+
+  user.verification = {
+    code: hash,
+    expiresAt,
+    createdAt: now,
+  };
+  await user.save();
+
+  try {
+    await sendEmail({ to: user.email, subject: 'Verify your account', html });
+  } catch (_) {
+    user.verification = undefined;
+    await user.save();
+  }
+
+  res.status(200).json({
+    status: 'success',
+    message: 'A new verification code has been sent to your email.',
+  });
 };
 
 export const refreshToken = async (req, res) => {

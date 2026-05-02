@@ -23,6 +23,12 @@ const userSchema = new Schema(
       min: [6, 'Password must be 6 char long'],
       select: false,
     },
+    isVerified: { type: String, default: false },
+    verification: {
+      code: { type: String, select: false },
+      expiresAt: Date,
+      createdAt: Date,
+    },
     role: { type: String, enum: ['user', 'admin', 'owner'], default: 'user' },
     isActive: {
       type: Boolean,
