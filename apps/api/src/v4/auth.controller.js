@@ -21,16 +21,16 @@ export const register = async (req, res) => {
     user = await User.create({ name, email, password });
   } catch (err) {
     if (err?.code === 11000) {
-      return res.status(400).json({ status: 'fail', message: 'Email already exists' });
+      return res.status(409).json({ status: 'fail', message: 'Email already exists' });
     } else throw err;
   }
 
   const otp = generateOtp(6);
   const hash = await hashOtp(otp);
-  const html = getOtpHtml();
-  const expireAt = Date.now() + Number(process.env.OTP_EXPIRES_MINUTES) * 60 * 1000;
+  const html = getOtpHtml(otp);
+  const expiresAt = Date.now() + Number(process.env.OTP_EXPIRES_MINUTES) * 60 * 1000;
 
-  user.verification = { code: hash, expireAt, createdAt: Date.now() };
+  user.verification = { code: hash, expiresAt, createdAt: Date.now() };
 
   await user.save();
 
@@ -44,18 +44,7 @@ export const register = async (req, res) => {
     });
   }
 
-  const accessToken = createTokenV1({ userId: user.id });
-  const refreshToken = createTokenV1({ userId: user.id }, 'refresh');
-
-  const hashRefreshToken = await hashToken(refreshToken);
-
-  user.refreshToken = hashRefreshToken;
-
-  await user.save();
-  res
-    .status(201)
-    .cookie('refreshToken', refreshToken, cookieOptions)
-    .json({ status: 'success', message: 'User register successfully', user, accessToken });
+  res.status(201).json({ status: 'success', message: 'User register successfully', user });
 };
 
 export const login = async (req, res) => {
@@ -66,7 +55,7 @@ export const login = async (req, res) => {
 
   const user = await User.findOne({ email }).select('+password');
 
-  if (!user) return res.status(400).json({ status: 'fail', message: 'Invalid email or password' });
+  if (!user) return res.status(401).json({ status: 'fail', message: 'Invalid email or password' });
 
   if (!user.isVerified) {
     return res.status(403).json({
@@ -75,10 +64,10 @@ export const login = async (req, res) => {
     });
   }
 
-  const isValidPass = bcrypt.compare(password, user.password);
+  const isValidPass = await bcrypt.compare(password, user.password);
 
   if (!isValidPass)
-    return res.status(400).json({ status: 'fail', message: 'Invalid email or password' });
+    return res.status(401).json({ status: 'fail', message: 'Invalid email or password' });
 
   const accessToken = createTokenV1({ userId: user.id });
   const refreshToken = createTokenV1({ userId: user.id }, 'refresh');
@@ -99,16 +88,17 @@ export const verify = async (req, res) => {
   const { email, otp } = req.body;
 
   if (!email || !otp)
-    return res.status(400).json({ status: 'fail', message: 'Email and opt required' });
+    return res.status(400).json({ status: 'fail', message: 'Email and OTP are required' });
 
   const user = await User.findOne({ email }).select('+verification.code');
 
-  if (!user) return res.status(400).json({ status: 'fail', message: 'Invalid email or OTP' });
+  if (!user)
+    return res.status(404).json({ status: 'fail', message: 'User not found or invalid email' });
 
   if (user.isVerified)
-    return res.status(400).json({ status: 'fail', message: 'Account already verified' });
+    return res.status(409).json({ status: 'fail', message: 'Account already verified' });
 
-  const isExpired = Date.now() > user.verification?.expireAt;
+  const isExpired = Date.now() > user.verification?.expiresAt;
   if (isExpired)
     return res
       .status(400)
@@ -141,17 +131,18 @@ export const resendOtp = async (req, res) => {
 
   const user = await User.findOne({ email }).select('+verification.code');
 
-  if (!user) return res.status(400).json({ status: 'fail', message: 'Invalid email' });
+  if (!user)
+    return res.status(404).json({ status: 'fail', message: 'User not found or invalid email' });
   if (user.isVerified)
-    return res.status(400).json({ status: 'fail', message: 'Account already verified' });
+    return res.status(409).json({ status: 'fail', message: 'Account already verified' });
   const now = Date.now();
   const COOLDOWN_MS = 60_000;
-  const createdAt = user.verification.createAt;
+  const createdAt = user.verification.createdAt;
 
-  if (createdAt && user.verification?.createdAt + COOLDOWN_MS < now) {
+  if (createdAt && now - createdAt < COOLDOWN_MS) {
     const retryAfter = Math.ceil((COOLDOWN_MS - (now - createdAt)) / 1000);
 
-    return res.status(429).json({
+    return res.status(500).json({
       status: 'fail',
       message: `Please wait ${retryAfter}s before requesting a new OTP`,
       retryAfter,
@@ -169,6 +160,7 @@ export const resendOtp = async (req, res) => {
     expiresAt,
     createdAt: now,
   };
+  await user.save();
 
   try {
     await sendEmail({ to: user.email, subject: '', html });
@@ -177,7 +169,6 @@ export const resendOtp = async (req, res) => {
     await user.save();
   }
 
-  await user.save();
   res.status(200).json({
     status: 'success',
     message: 'A new verification code has been sent to your email.',
@@ -233,7 +224,7 @@ export const refreshAccessToken = async (req, res) => {
   const isValidToken = await verifyHash(refreshToken, user.refreshToken);
 
   if (!isValidToken) {
-    return res.status(401).json({
+    return res.status(403).json({
       status: 'fail',
       message: 'Refresh token mismatch. Possible session hijack detected.',
     });
