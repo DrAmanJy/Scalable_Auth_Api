@@ -19,9 +19,9 @@ export const register = async (req, res) => {
     const otp = generateOtp(6);
     const hash = await hashOtp(otp);
     const html = getOtpHtml(otp);
-    const expireAt = Date.now() + Number(process.env.OTP_EXPIRES_MINUTES) * 60 * 1000;
+    const expiresAt = Date.now() + Number(process.env.OTP_EXPIRES_MINUTES) * 60 * 1000;
 
-    newUser.verification = { code: hash, expireAt, createdAt: Date.now() };
+    newUser.verification = { code: hash, expiresAt, createdAt: Date.now() };
 
     await newUser.save();
     try {
@@ -34,13 +34,10 @@ export const register = async (req, res) => {
       });
     }
 
-    const accessToken = createTokenV1({ userId: newUser._id });
-
     res.status(201).json({
       status: 'success',
-      message: 'User successfully register',
+      message: 'Account created. Please verify your email.',
       user: newUser,
-      accessToken,
     });
   } catch (err) {
     res.status(500).json({ status: 'fail', message: err.message || 'Internal server error' });
@@ -51,7 +48,7 @@ export const verify = async (req, res) => {
   const { email, otp } = req.body;
 
   if (!email || !otp) {
-    return res.status(400).json({ status: 'fail', message: 'Email and opt required' });
+    return res.status(400).json({ status: 'fail', message: 'Email and OTP are required' });
   }
 
   const user = await User.findOne({ email }).select('+verification.code');
@@ -61,7 +58,7 @@ export const verify = async (req, res) => {
   if (user.isVerified)
     return res.status(400).json({ status: 'fail', message: 'Account already verified' });
 
-  const isExpired = Date.now() > user.verification?.expireAt || 0;
+  const isExpired = !user.verification?.expiresAt || Date.now() > user.verification.expiresAt;
 
   if (isExpired)
     return res
@@ -149,7 +146,7 @@ export const login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password)
-      res.status(400).json({ status: 'fail', message: 'All fields are required' });
+      return res.status(400).json({ status: 'fail', message: 'All fields are required' });
 
     const existingUser = await User.findOne({ email }).select('+password');
 
