@@ -1,10 +1,17 @@
 import User from '../models/userV2.js';
 import crypto from 'crypto';
-import { createTokenV1, verifyHash, verifyToken } from '../utils/token.js';
+import {
+  createResetToken,
+  createTokenV1,
+  createTokenV2,
+  verifyHash,
+  verifyToken,
+} from '../utils/token.js';
 import refreshTokenStorage from './auth.service.js';
 import { generateOtp, hashOtp, verifyOtp } from '../utils/otp.js';
 import { getOtpHtml } from '../templates/email/otp.template.js';
 import { sendEmail } from '../services/email.js';
+import { getResetPasswordHtml } from '../templates/email/password.template.js';
 
 const cookieOptions = {
   httpOnly: true,
@@ -96,6 +103,51 @@ export const login = async (req, res) => {
     .cookie('deviceId', deviceId, deviceCookieOptions)
     .cookie('refreshToken', refreshToken, cookieOptions)
     .json({ status: 'success', message: 'User successfully logged in', user, accessToken });
+};
+
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({
+      status: 'fail',
+      message: 'Email is required',
+    });
+  }
+
+  const genericResponse = {
+    status: 'success',
+    message: 'If an account with that email exists, a password reset link has been sent.',
+  };
+
+  const user = await User.findOne({ email }).select('+password');
+
+  if (!user || !user.isVerified) {
+    return res.status(200).json(genericResponse);
+  }
+
+  const expiresInMs = Number(process.env.RESET_TOKEN_EXPIRES_MINUTES || 10) * 60 * 1000;
+
+  const resetToken = createTokenV2({ userId: user._id }, expiresInMs, user.password);
+
+  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+  const html = getResetPasswordHtml(user.name, resetUrl);
+
+  try {
+    await sendEmail({
+      to: user.email,
+      subject: 'Reset your password',
+      html,
+    });
+  } catch {
+    return res.status(500).json({
+      status: 'fail',
+      message: 'Failed to send reset email. Please try again later.',
+    });
+  }
+
+  return res.status(200).json(genericResponse);
 };
 
 export const verify = async (req, res) => {

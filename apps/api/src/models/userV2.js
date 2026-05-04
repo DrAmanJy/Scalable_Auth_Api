@@ -29,6 +29,10 @@ const userSchema = new Schema(
       expiresAt: Date,
       createdAt: Date,
     },
+    resetToken: {
+      token: { type: String, select: false },
+      expiresAt: Date,
+    },
     role: { type: String, enum: ['user', 'admin', 'owner'], default: 'user' },
     isActive: {
       type: Boolean,

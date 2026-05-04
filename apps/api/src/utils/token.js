@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 
 export const createTokenV1 = (payload, type = 'access') => {
   const expiresIn =
@@ -9,6 +10,16 @@ export const createTokenV1 = (payload, type = 'access') => {
 
   if (!secretKey || !expiresIn) {
     throw new Error(`Missing JWT config for ${type} token`);
+  }
+
+  return jwt.sign(payload, secretKey, { expiresIn });
+};
+
+export const createTokenV2 = (payload, expiresIn,secret) => {
+  const secretKey = process.env.RESET_TOKEN_SECRET +secret;
+
+  if (!secretKey || !expiresIn) {
+    throw new Error(`Missing JWT config for reset token`);
   }
 
   return jwt.sign(payload, secretKey, { expiresIn });
@@ -34,3 +45,4 @@ export const verifyHash = async (data, encrypted) => {
   const isValid = bcrypt.compare(data, encrypted);
   return isValid;
 };
+
