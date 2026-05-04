@@ -243,3 +243,42 @@ export const forgotPassword = async (req, res) => {
   return res.status(200).json(genericResponse);
 };
 
+export const resetPassword = async (req, res) => {
+  const { resetToken } = req.params;
+  const { password } = req.body;
+
+  if (!resetToken || !password) {
+    return res.status(400).json({ status: 'fail', message: 'Reset token and new password are required' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.default.decode(resetToken);
+  } catch {
+    return res.status(400).json({ status: 'fail', message: 'Invalid reset token' });
+  }
+
+  if (!decoded?.userId) {
+    return res.status(400).json({ status: 'fail', message: 'Invalid reset token' });
+  }
+
+  const user = await User.findById(decoded.userId).select('+password');
+
+  if (!user) {
+    return res.status(400).json({ status: 'fail', message: 'Invalid reset token' });
+  }
+
+  try {
+    const jwt = await import('jsonwebtoken');
+    jwt.default.verify(resetToken, process.env.RESET_TOKEN_SECRET + user.password);
+  } catch {
+    return res.status(400).json({ status: 'fail', message: 'Reset token is invalid or has expired' });
+  }
+
+  user.password = password;
+  await user.save();
+
+  return res.status(200).json({ status: 'success', message: 'Password reset successfully. You can now log in.' });
+};
+
+
