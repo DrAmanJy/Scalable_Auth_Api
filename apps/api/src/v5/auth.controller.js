@@ -1,5 +1,6 @@
 import User from '../models/userV2.js';
 import crypto from 'crypto';
+import jwt from 'jsonwebtoken';
 import {
   createResetToken,
   createTokenV1,
@@ -379,4 +380,62 @@ export const getMe = async (req, res) => {
   res
     .status(200)
     .json({ status: 'success', message: 'User fetched successfully.', user: req.user });
+};
+
+export const resetPassword = async (req, res) => {
+  const { resetToken } = req.params;
+  const { password } = req.body;
+
+  if (!resetToken || !password) {
+    return res.status(400).json({ status: 'fail', message: 'Reset token and new password are required' });
+  }
+
+  let decoded;
+  try {
+    decoded = jwt.decode(resetToken);
+  } catch {
+    return res.status(400).json({ status: 'fail', message: 'Invalid reset token' });
+  }
+
+  if (!decoded?.userId) {
+    return res.status(400).json({ status: 'fail', message: 'Invalid reset token' });
+  }
+
+  const user = await User.findById(decoded.userId).select('+password');
+
+  if (!user) {
+    return res.status(400).json({ status: 'fail', message: 'Invalid reset token' });
+  }
+
+  try {
+    jwt.verify(resetToken, process.env.RESET_TOKEN_SECRET + user.password);
+  } catch {
+    return res.status(400).json({ status: 'fail', message: 'Reset token is invalid or has expired' });
+  }
+
+  user.password = password;
+  await user.save();
+
+  return res.status(200).json({ status: 'success', message: 'Password reset successfully. You can now log in.' });
+};
+
+export const changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ status: 'fail', message: 'Current password and new password are required' });
+  }
+
+  const user = await User.findById(req.user._id).select('+password');
+
+  const isValid = await verifyHash(currentPassword, user.password);
+
+  if (!isValid) {
+    return res.status(401).json({ status: 'fail', message: 'Current password is incorrect' });
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return res.status(200).json({ status: 'success', message: 'Password changed successfully.' });
 };
