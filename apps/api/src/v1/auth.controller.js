@@ -282,3 +282,23 @@ export const resetPassword = async (req, res) => {
 };
 
 
+export const changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ status: 'fail', message: 'Current password and new password are required' });
+  }
+
+  const user = await User.findById(req.user._id).select('+password');
+
+  const isValid = await bcrypt.compare(currentPassword, user.password);
+
+  if (!isValid) {
+    return res.status(401).json({ status: 'fail', message: 'Current password is incorrect' });
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  return res.status(200).json({ status: 'success', message: 'Password changed successfully.' });
+};
