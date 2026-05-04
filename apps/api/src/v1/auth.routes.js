@@ -9,4 +9,8 @@ router.post('/resend-otp', authController.resendOtp);
 router.post('/login', authController.login);
 router.get('/me', requireBasicAuth, authController.getMe);
 
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password/:resetToken', authController.resetPassword);
+router.post('/change-password', requireBasicAuth, authController.changePassword);
+
 export default router;
