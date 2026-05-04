@@ -12,4 +12,8 @@ router.post('/refresh-token', authController.refreshToken);
 
 router.get('/me', requireDeviceBoundAuth, authController.getMe);
 
+router.post('/forgot-password', authController.forgotPassword);
+router.post('/reset-password/:resetToken', authController.resetPassword);
+router.post('/change-password', requireDeviceBoundAuth, authController.changePassword);
+
 export default router;
