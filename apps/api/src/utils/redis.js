@@ -13,12 +13,19 @@ export async function getRedisClient() {
 
   redisClient = createClient({
     url: redisUri,
+    pingInterval: 1000 * 60 * 3, // Keep connection alive when idle
     socket: {
       tls: isTlsUrl,
     },
   });
 
-  redisClient.on('error', (err) => console.error('Redis Error:', err));
+  redisClient.on('error', (err) => {
+    // Suppress connection reset and timeout errors when app is idle and not actively using Redis
+    if (err?.code === 'ECONNRESET' || err?.name === 'ConnectionTimeoutError') {
+      return;
+    }
+    console.error('Redis Error:', err);
+  });
 
   await redisClient.connect();
   console.log('New Redis connection established.');
