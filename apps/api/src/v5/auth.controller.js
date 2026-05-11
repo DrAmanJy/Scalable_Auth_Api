@@ -2,7 +2,6 @@ import User from '../models/userV2.js';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import {
-  createResetToken,
   createTokenV1,
   createTokenV2,
   verifyHash,
