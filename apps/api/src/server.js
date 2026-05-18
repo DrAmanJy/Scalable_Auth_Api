@@ -36,7 +36,7 @@ server.use('/v5/auth', v5routes);
 server.use(errorHandler);
 
 await connectDb();
-server.listen(3000, (err) => {
+server.listen(process.env.APP_PORT, (err) => {
   if (err) {
     console.log('Failed to start server', err.message);
     return;
